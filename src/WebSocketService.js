@@ -40,6 +40,7 @@ class WebSocketService {
   socketNewMessage(data) {
     const parsedData = JSON.parse(data);
     const { type } = parsedData;
+    console.log(type);
     if (this.callbacks[type]) {
       this.callbacks[type](parsedData);
     } else {
@@ -48,7 +49,7 @@ class WebSocketService {
   }
 
   addCallbacks(moveCallback) {
-    this.callbacks['move'] = moveCallback;
+    this.callbacks['bestMove'] = moveCallback;
   }
 
   sendMessage(data) {
