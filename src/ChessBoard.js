@@ -1,35 +1,40 @@
-// src/Chessboard.js
+
 
 import React, { useState, useEffect } from 'react';
 import { Chess } from 'chess.js';
 import Chessboard from 'chessboardjsx';
+import WebSocketInstance from './WebSocketService';
 
-const ChessboardComponent = ({ ws }) => {
+const ChessboardComponent = () => {
     const [game, setGame] = useState(new Chess());
     const [fen, setFen] = useState('start');
     const [status, setStatus] = useState('');
     const [pgn, setPgn] = useState('');
 
     useEffect(() => {
-        updateStatus();
+        // Register callback for receiving the best move from the server
+        WebSocketInstance.addCallback('bestMove', handleBestMove);
+        WebSocketInstance.addCallback('openingMove', handleOpeningMove);
+
+        return () => {
+            // Optionally, remove callback or clean up on component unmount
+        };
     }, []);
 
-    useEffect(() => {
-        if (ws) {
-            ws.addCallbacks((data) => {
-                console.log('Move received from server:', data);
-                // Handle the move received from the server (if needed)
-                console.log(data.bestMove.from, data.bestMove.to);
-                game.move({
-                    from: data.bestMove.from.toLowerCase(), 
-                    to: data.bestMove.to.toLowerCase(),
-                })
-                
-            setFen(game.fen());
-            updateStatus();
-           });
-        }
-    }, [ws]);
+    const handleOpeningMove = (data) => {
+        game.move(data.san)
+        setFen(game.fen());
+        updateStatus();
+    }
+    const handleBestMove = (data) => {
+        const move = {
+            from: data.bestMove.from.toLowerCase(),
+            to: data.bestMove.to.toLowerCase(),
+        };
+        game.move(move);
+        setFen(game.fen());
+        updateStatus();
+    };
 
     const onDragStart = (source, piece) => {
         if (game.game_over()) return false;
@@ -50,22 +55,19 @@ const ChessboardComponent = ({ ws }) => {
                 promotion: 'q', // always promote to a queen for simplicity
             });
 
-            console.log(move);
             setFen(game.fen());
             updateStatus();
 
             // Send move to WebSocket server
-            if (ws) {
-                ws.sendMessage({
-                    type: 'move',
-                    move: {
-                        moveNotation: move.san,
-                        from: sourceSquare,
-                        to: targetSquare,
-                        fen: game.fen(),
-                    },
-                });
-            }
+            WebSocketInstance.sendMessage({
+                type: 'move',
+                move: {
+                    moveNotation: move.san,
+                    from: sourceSquare,
+                    to: targetSquare,
+                    fen: game.fen(),
+                },
+            });
         } catch {
             return 'snapback';
         }
@@ -115,3 +117,4 @@ const ChessboardComponent = ({ ws }) => {
 };
 
 export default ChessboardComponent;
+

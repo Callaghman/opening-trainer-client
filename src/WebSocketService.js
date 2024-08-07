@@ -1,8 +1,9 @@
-// src/WebSocket.js
+// src/WebSocketService.js
 
 class WebSocketService {
   static instance = null;
   callbacks = {};
+  messageQueue = [];
 
   static getInstance() {
     if (!WebSocketService.instance) {
@@ -13,14 +14,21 @@ class WebSocketService {
 
   constructor() {
     this.socketRef = null;
+    this.connect();
   }
 
   connect() {
+    if (this.socketRef && this.socketRef.readyState !== WebSocket.CLOSED) {
+      console.log('WebSocket already open or connecting.');
+      return;
+    }
+
     const url = 'ws://localhost:8000';
     this.socketRef = new WebSocket(url);
 
     this.socketRef.onopen = () => {
       console.log('WebSocket connection opened');
+      this.flushMessageQueue();
     };
 
     this.socketRef.onmessage = (e) => {
@@ -33,14 +41,28 @@ class WebSocketService {
 
     this.socketRef.onclose = () => {
       console.log('WebSocket connection closed');
-      this.connect(); // Reconnect on close
+      setTimeout(() => this.connect(), 5000); // Attempt to reconnect after 5 seconds
     };
+  }
+
+  flushMessageQueue() {
+    while (this.messageQueue.length > 0 && this.socketRef && this.socketRef.readyState === WebSocket.OPEN) {
+      this.socketRef.send(JSON.stringify(this.messageQueue.shift()));
+    }
+  }
+
+  sendMessage(data) {
+    if (this.socketRef && this.socketRef.readyState === WebSocket.OPEN) {
+      this.socketRef.send(JSON.stringify(data));
+    } else {
+      console.log('Queueing message:', data);
+      this.messageQueue.push(data); // Queue the message if the connection is not open
+    }
   }
 
   socketNewMessage(data) {
     const parsedData = JSON.parse(data);
     const { type } = parsedData;
-    console.log(type);
     if (this.callbacks[type]) {
       this.callbacks[type](parsedData);
     } else {
@@ -48,35 +70,16 @@ class WebSocketService {
     }
   }
 
-  addCallbacks(moveCallback) {
-    this.callbacks['bestMove'] = moveCallback;
-  }
-
-  sendMessage(data) {
-    this.socketRef.send(JSON.stringify(data)); // Convert to JSON string before sending
+  addCallback(type, callback) {
+    this.callbacks[type] = callback;
   }
 
   state() {
-    return this.socketRef.readyState;
-  }
-
-  waitForSocketConnection(callback) {
-    const socket = this.socketRef;
-    const recursion = this.waitForSocketConnection;
-    setTimeout(() => {
-      if (socket.readyState === 1) {
-        console.log('Connection is made');
-        if (callback != null) {
-          callback();
-        }
-      } else {
-        console.log('Waiting for connection...');
-        recursion(callback);
-      }
-    }, 1); // wait 1 millisecond for the connection...
+    return this.socketRef ? this.socketRef.readyState : WebSocket.CLOSED;
   }
 }
 
 const WebSocketInstance = WebSocketService.getInstance();
 
 export default WebSocketInstance;
+
