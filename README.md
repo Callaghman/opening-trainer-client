@@ -1,4 +1,4 @@
-This is a proof of concept project.
+.This is a proof of concept project.
 
 It was created with the help of chatGPT due to my lack of knowledge using React and Frontend work in general. 
 
